@@ -1,6 +1,5 @@
 package br.com.thiengo.futebolblog;
 
-import android.os.Bundle;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -14,22 +13,43 @@ import android.widget.TextView;
 
 import com.squareup.picasso.Picasso;
 
+import org.androidannotations.annotations.AfterViews;
+import org.androidannotations.annotations.EActivity;
+import org.androidannotations.annotations.Extra;
+import org.androidannotations.annotations.ViewById;
+
 import br.com.thiengo.futebolblog.domain.Article;
 
+@EActivity(R.layout.activity_content)
 public class ContentActivity extends AppCompatActivity {
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_content);
+    @ViewById
+    TextView tvTitle;
+    @ViewById
+    TextView tvViewsCount;
+    @ViewById
+    TextView tvCommentsCount;
+    @ViewById
+    TextView tvTimeReading;
+    @ViewById
+    TextView tvContent;
+    @ViewById
+    ImageView ivHeader;
+    @ViewById(R.id.toolbar_layout)
+    CollapsingToolbarLayout collapsingToolbarLayout;
+    @ViewById
+    Toolbar toolbar;
+    @ViewById
+    FloatingActionButton fab;
+    @Extra
+    Article article;
 
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    @AfterViews
+    protected void init(){
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -38,40 +58,22 @@ public class ContentActivity extends AppCompatActivity {
             }
         });
 
-        init();
-    }
-
-    private void init(){
-        if( getIntent() == null
-                && getIntent().getParcelableExtra(Article.KEY) == null ){
+        if( article == null ){
             return;
         }
 
-        Article article = getIntent().getParcelableExtra(Article.KEY);
-
-        CollapsingToolbarLayout collapsingToolbarLayout = (CollapsingToolbarLayout) findViewById(R.id.toolbar_layout);
         collapsingToolbarLayout.setTitle( article.getTitle() );
 
-        ImageView imageView = (ImageView) findViewById(R.id.iv_header);
         Picasso
-                .with(this)
-                .load( article.getImageUrl() )
-                .into(imageView);
+            .with(this)
+            .load( article.getImageUrl() )
+            .into(ivHeader);
 
-        TextView tv = (TextView) findViewById(R.id.tv_title);
-        tv.setText( article.getTitle() );
-
-        tv = (TextView) findViewById(R.id.tv_views_count);
-        tv.setText( String.valueOf( article.getNumViews() ) );
-
-        tv = (TextView) findViewById(R.id.tv_comments_count);
-        tv.setText( String.valueOf( article.getNumComments() ) );
-
-        tv = (TextView) findViewById(R.id.tv_time_reading);
-        tv.setText( String.valueOf( article.getTimeToRead() ) );
-
-        tv = (TextView) findViewById(R.id.tv_content);
-        tv.setText( String.valueOf(Html.fromHtml(article.getContent()) ) );
+        tvTitle.setText( article.getTitle() );
+        tvViewsCount.setText( String.valueOf( article.getNumViews() ) );
+        tvCommentsCount.setText( String.valueOf( article.getNumComments() ) );
+        tvTimeReading.setText( String.valueOf( article.getTimeToRead() ) );
+        tvContent.setText( String.valueOf(Html.fromHtml(article.getContent()) ) );
     }
 
     @Override

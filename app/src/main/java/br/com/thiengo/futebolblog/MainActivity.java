@@ -1,8 +1,5 @@
 package br.com.thiengo.futebolblog;
 
-import android.content.Intent;
-import android.os.AsyncTask;
-import android.os.Bundle;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -12,10 +9,18 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 
+import org.androidannotations.annotations.AfterViews;
+import org.androidannotations.annotations.Background;
+import org.androidannotations.annotations.Bean;
+import org.androidannotations.annotations.EActivity;
+import org.androidannotations.annotations.InstanceState;
+import org.androidannotations.annotations.ItemClick;
+import org.androidannotations.annotations.NonConfigurationInstance;
+import org.androidannotations.annotations.UiThread;
+import org.androidannotations.annotations.ViewById;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -24,7 +29,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -32,67 +36,66 @@ import java.util.ArrayList;
 import br.com.thiengo.futebolblog.domain.Article;
 import br.com.thiengo.futebolblog.domain.ArticlesAdapter;
 
+@EActivity(R.layout.activity_main)
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
 
-    private ListView listView;
-    private ArrayList<Article> articles = new ArrayList<>();
+    @ViewById(R.id.lv_articles)
+    protected ListView listView;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    @InstanceState
+    @NonConfigurationInstance
+    public ArrayList<Article> articles = new ArrayList<>();
 
-        if( savedInstanceState != null && savedInstanceState.getParcelableArrayList(Article.KEY) != null ){
-            articles = savedInstanceState.getParcelableArrayList(Article.KEY);
-        }
+    @ViewById(R.id.toolbar)
+    protected Toolbar toolbar;
 
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    @ViewById(R.id.drawer_layout)
+    protected DrawerLayout drawer;
+
+    @ViewById(R.id.nav_view)
+    protected NavigationView navigationView;
+
+    @ViewById(R.id.pb_load)
+    protected ProgressBar progressBar;
+
+    @Bean
+    protected ArticlesAdapter articlesAdapter;
+
+
+    @AfterViews
+    protected void viewsInitialized(){
         setSupportActionBar(toolbar);
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.addDrawerListener(toggle);
         toggle.syncState();
 
-        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
         retrieveData();
-        initListView();
+        listView.setAdapter( articlesAdapter );
     }
 
-    private void initListView(){
-        ArticlesAdapter articlesAdapter = new ArticlesAdapter(this, articles);
-        listView = (ListView) findViewById(R.id.lv_articles);
-        listView.setAdapter( articlesAdapter );
-
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                Intent intent = new Intent(MainActivity.this, ContentActivity.class);
-                intent.putExtra( Article.KEY, articles.get(i) );
-                startActivity(intent);
-            }
-        });
+    @ItemClick(R.id.lv_articles)
+    void itenClickedListener(Article article) {
+        ContentActivity_.intent(this).article( article ).start();
     }
 
     private void retrieveData(){
         if( articles.size() == 0 ){
             progressBarLoad(true);
-            new RequestAsync(this).execute();
+            runInBackground();
         }
     }
 
     private void progressBarLoad( boolean activated ){
-        ProgressBar progressBar = (ProgressBar) findViewById(R.id.pb_load);
         progressBar.setVisibility( activated ? View.VISIBLE : View.GONE );
     }
 
     @Override
     public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {
@@ -101,30 +104,17 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
-        outState.putParcelableArrayList(Article.KEY, articles);
-        super.onSaveInstanceState(outState);
-    }
-
-    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -148,7 +138,6 @@ public class MainActivity extends AppCompatActivity
 
         }
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
@@ -170,41 +159,27 @@ public class MainActivity extends AppCompatActivity
         return jsonString.toString();
     }
 
-    private static class RequestAsync extends AsyncTask<Void, Void, String> {
-        private WeakReference<MainActivity> activityWeak;
+    @Background
+    protected void runInBackground(){
+        try {
+            String answer = serverRequest();
 
-        RequestAsync( MainActivity activity ){
-            activityWeak = new WeakReference<>(activity);
-        }
+            JSONArray jsonArray = new JSONArray( answer );
+            for( int i = 0, tam = jsonArray.length(); i < tam; i++ ){
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                Article a = new Article();
+                a.setFromJson(jsonObject);
 
-        @Override
-        protected String doInBackground(Void... voids) {
-            try {
-                String answer = activityWeak.get().serverRequest();
-
-                JSONArray jsonArray = new JSONArray( answer );
-                for( int i = 0, tam = jsonArray.length(); i < tam; i++ ){
-                    JSONObject jsonObject = jsonArray.getJSONObject(i);
-                    Article a = new Article();
-                    a.setFromJson(jsonObject);
-
-                    activityWeak.get().articles.add( a );
-                }
+                articles.add( a );
             }
-            catch(Exception e){}
-            return null;
+            runInUIThread();
         }
+        catch(Exception e){}
+    }
 
-        @Override
-        protected void onPostExecute(String s) {
-            super.onPostExecute(s);
-
-            if( activityWeak.get() != null ){
-                activityWeak.get().progressBarLoad(false);
-
-                ArticlesAdapter adapter = (ArticlesAdapter) activityWeak.get().listView.getAdapter();
-                adapter.notifyDataSetChanged();
-            }
-        }
+    @UiThread
+    protected void runInUIThread(){
+        progressBarLoad(false);
+        articlesAdapter.notifyDataSetChanged();
     }
 }

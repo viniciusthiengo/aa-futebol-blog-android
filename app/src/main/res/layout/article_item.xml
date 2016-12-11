@@ -23,7 +23,7 @@
             android:layout_marginRight="8dp"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/thumb_article"/>
+            android:src="@null"/>
 
         <TextView
             android:id="@+id/tv_title"
